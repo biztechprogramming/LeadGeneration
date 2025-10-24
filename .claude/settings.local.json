@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//mnt/c/dev/ai/goose/crates/goose/src/providers/**)",
+      "Read(//mnt/c/dev/ai/goose/crates/goose/src/oauth/**)",
+      "Read(//mnt/c/dev/ai/goose/crates/goose/src/**)",
+      "Bash(chmod:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

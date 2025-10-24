@@ -167,3 +167,7 @@ cython_debug/
 
 # Pypi
 .pypirc
+
+/LeadGen/
+/test_reports_cerebras/
+/test_reports/

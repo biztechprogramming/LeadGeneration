@@ -1,0 +1,17 @@
+# Gemini CLI Configuration for Cerebras API
+# This file configures the Gemini CLI to use Cerebras API endpoint
+
+# API Configuration
+GEMINI_API_BASE=https://api.cerebras.ai/v1
+GEMINI_MODEL=llama-3.3-70b
+
+# API Key (loaded from environment)
+# Set GEMINI_API_KEY environment variable or use gemini-cerebras.sh wrapper script
+
+# Default Parameters
+GEMINI_TEMPERATURE=0.7
+GEMINI_MAX_TOKENS=4096
+
+# Request Configuration
+GEMINI_TIMEOUT=30
+GEMINI_RETRY_COUNT=3
