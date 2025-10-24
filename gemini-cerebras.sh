@@ -49,6 +49,11 @@ fi
 # Export as GEMINI_API_KEY for Gemini CLI
 export GEMINI_API_KEY="${CEREBRAS_API_KEY}"
 
+# Export FIRECRAWL_API_KEY if present (for Firecrawl MCP)
+if [[ -n "${FIRECRAWL_API_KEY:-}" ]]; then
+    export FIRECRAWL_API_KEY
+fi
+
 # Check if gemini CLI is installed
 if ! command -v gemini &> /dev/null; then
     error_exit "Gemini CLI not found. Install it with: npm install -g @google/generative-ai-cli"

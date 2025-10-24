@@ -87,10 +87,38 @@ class IterativeResearchOrchestrator:
         phone: str = "",
         source: str = ""
     ) -> None:
-        """Save a contact (bound to current accumulator)."""
+        """
+        Save a contact (bound to current accumulator).
+
+        Validation: Rejects contacts where ALL required fields are empty.
+        At minimum, we need either a name OR an email OR both.
+        """
+        # Strip whitespace from all fields
+        name = name.strip()
+        title = title.strip()
+        email = email.strip()
+        phone = phone.strip()
+        source = source.strip()
+
+        # Validation: Must have at least name or email
+        if not name and not email:
+            print(f"    ⚠ Rejected empty contact (no name and no email)")
+            print(f"      Debug: name='{name}', email='{email}', phone='{phone}'")
+            return
+
+        # Additional quality check: Warn about contacts with only phone
+        if not name and not email and phone:
+            print(f"    ⚠ Rejected phone-only contact: {phone}")
+            print(f"      Reason: Need at least a name or email for valid contact")
+            return
+
         if self.current_accumulator:
             self.current_accumulator.add_contact(name, title, email, phone, source)
             print(f"    ✓ Saved contact: {name} - {title}")
+            if email:
+                print(f"      Email: {email}")
+            if phone:
+                print(f"      Phone: {phone}")
 
     def _save_pain_point(
         self,

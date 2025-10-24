@@ -1,26 +1,37 @@
 """
 Website exploration module for research system.
 
-This module handles web page exploration, LinkedIn searches,
-and news searches. Currently provides stub implementations.
+This module handles web page exploration by requesting scraping
+via Claude Code's Firecrawl MCP integration.
 """
 
 from typing import Tuple, Optional, Dict, List
+import json
+import time
+import os
+from pathlib import Path
 
 
 class WebsiteExplorer:
     """
     Explores company website iteratively based on AI suggestions.
-    Provides placeholder methods for various exploration strategies.
+    Uses Claude Code + Firecrawl MCP for web scraping via request files.
     """
 
-    def __init__(self):
-        """Initialize website explorer."""
-        pass
+    def __init__(self, scrape_cache_dir: str = "scrape_cache"):
+        """
+        Initialize website explorer.
+
+        Args:
+            scrape_cache_dir: Directory for scraping request/response files
+        """
+        self.scrape_cache_dir = Path(scrape_cache_dir)
+        self.scrape_cache_dir.mkdir(exist_ok=True)
+        print(f"✓ Website explorer initialized with cache: {self.scrape_cache_dir}")
 
     def explore_page(self, url: str, reason: str = "") -> Tuple[bool, Optional[str]]:
         """
-        Explore a webpage (placeholder for actual scraping).
+        Explore a webpage using Claude Code + Firecrawl MCP.
 
         Args:
             url: URL to explore
@@ -33,9 +44,65 @@ class WebsiteExplorer:
         if reason:
             print(f"      Reason: {reason}")
 
-        # Placeholder - in real implementation, would use web scraping
-        # Could integrate with tools like BeautifulSoup, Playwright, etc.
-        return False, None
+        try:
+            # Check cache first
+            cache_file = self.scrape_cache_dir / f"{hash(url)}.md"
+            if cache_file.exists():
+                content = cache_file.read_text(encoding='utf-8')
+                print(f"      ✓ Using cached content ({len(content)} characters)")
+                return True, content
+
+            # Use qwen -y -p to scrape via Firecrawl MCP (Cerebras-powered, much faster!)
+            import subprocess
+
+            prompt = f"""Use the Firecrawl MCP tool (mcp__firecrawl__firecrawl_scrape) to scrape this URL: {url}
+
+Parameters:
+- url: {url}
+- formats: ["markdown"]
+- onlyMainContent: true
+
+Return ONLY the markdown content, no explanations or formatting. Just the raw scraped content."""
+
+            result = subprocess.run(
+                ['qwen', '-y', '-p', prompt],
+                capture_output=True,
+                text=True,
+                timeout=60,  # Cerebras is much faster, reduce timeout
+                env={**os.environ, 'NODE_ENV': 'production'}  # Suppress debug output
+            )
+
+            if result.returncode == 0 and result.stdout:
+                content = result.stdout.strip()
+
+                # Filter out qwen debug output and other noise
+                lines = content.split('\n')
+                cleaned_lines = []
+                skip_patterns = ['[QWEN]', 'Created workspace', 'Setting language', 'Global language', 'Loading translations', 'Translations loaded', 'Available translation keys']
+                for line in lines:
+                    if not any(pattern in line for pattern in skip_patterns):
+                        cleaned_lines.append(line)
+                content = '\n'.join(cleaned_lines).strip()
+
+                # Basic validation - should have some content
+                if len(content) > 100:
+                    # Cache the result
+                    cache_file.write_text(content, encoding='utf-8')
+                    print(f"      ✓ Scraped {len(content)} characters (cached)")
+                    return True, content
+                else:
+                    print(f"      ✗ Content too short ({len(content)} chars)")
+                    return False, None
+            else:
+                print(f"      ✗ Scraping failed: {result.stderr[:200] if result.stderr else 'no output'}")
+                return False, None
+
+        except subprocess.TimeoutExpired:
+            print(f"      ✗ Scraping timeout after 120s")
+            return False, None
+        except Exception as e:
+            print(f"      ✗ Error scraping {url}: {e}")
+            return False, None
 
     def search_linkedin(
         self,

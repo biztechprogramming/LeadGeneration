@@ -25,17 +25,23 @@ class SalesIntelligenceResearcher:
     Automated sales intelligence research system using Claude Code CLI.
     """
 
-    def __init__(self, csv_path: str, output_dir: str = "sales_intelligence_reports"):
+    def __init__(self, csv_path: str, output_dir: str = "sales_intelligence_reports", log_dir: str = "ai_logs"):
         """
         Initialize the researcher.
 
         Args:
             csv_path: Path to CSV file with company data
             output_dir: Directory to store generated markdown reports
+            log_dir: Directory to store AI interaction logs
         """
         self.csv_path = csv_path
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
+
+        # Setup AI logging directory
+        self.log_dir = Path(log_dir)
+        self.log_dir.mkdir(exist_ok=True)
+        self.request_count = 0
 
         # Check if claude CLI is available
         if not self._check_claude_cli():
@@ -120,6 +126,26 @@ Generate content for file: {company_name}_CONTACTS.md
 
 **Objective:** List all key individuals, their potential buying role, and inferred contact information.
 
+**CRITICAL CONTACT QUALITY RULES:**
+❌ **DO NOT include contacts where you only have:**
+   - Generic phone numbers without names/emails
+   - Form field labels (like "Email *" or "Phone *")
+   - Contact form submit buttons without actual contact info
+   - Placeholder text or instructions
+
+✅ **ONLY include contacts where you have:**
+   - ACTUAL person names (e.g., "John Smith", "Jane Doe", "Bob Johnson")
+   - Department/role contacts WITH real email addresses (e.g., "Sales Team" + sales@company.com)
+   - Real email addresses even if person name is unknown
+   - Verifiable information from About Us, Team, or Leadership pages
+
+**Quality Standards:**
+- Prefer specific people over generic departments
+- Prioritize contacts with both name AND email
+- Include LinkedIn URLs if found for executives
+- If you find "Contact: 555-1234" but NO name/email, DO NOT add it to the table
+- If unsure whether data is valid, DO NOT include it
+
 **Format:** Markdown table for key contacts and brief org structure summary.
 
 | Name | Title (Actual/Inferred) | Buying Role (DM, Influencer, User) | Estimated Email Format | Source of Info |
@@ -127,6 +153,8 @@ Generate content for file: {company_name}_CONTACTS.md
 | **CEO/Founder** | [Current Title] | Decision Maker | [Example: jdoe@company.com] | [Source URL/Page] |
 | **Primary Target Persona** | [VP of Sales, Head of IT, CMO, etc.] | [DM/Influencer] | [Example: first.last@company.com] | [Source URL/Page] |
 | **Secondary Target** | [e.g., IT Director] | Influencer | [Example: initials@company.com] | [Source URL/Page] |
+
+**If NO valid contacts found:** State "No specific contacts identified on public website. Recommend LinkedIn prospecting or direct phone inquiry."
 
 **Org Structure Notes:**
 * **Key Departments:** Briefly describe major divisions mentioned
@@ -200,7 +228,7 @@ Generate content for file: {company_name}_CALL_PREP.md
 
     def analyze_with_ai(self, prompt: str, website_content: Optional[str] = None) -> str:
         """
-        Send prompt to Claude AI via Claude Code CLI.
+        Send prompt to Claude AI via Claude Code CLI with comprehensive logging.
 
         Args:
             prompt: Research prompt
@@ -209,10 +237,31 @@ Generate content for file: {company_name}_CALL_PREP.md
         Returns:
             AI-generated analysis
         """
+        self.request_count += 1
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        log_file = self.log_dir / f"claude_request_{self.request_count:03d}_{timestamp}.log"
+
         # Build full prompt
         full_prompt = prompt
         if website_content:
             full_prompt = f"**WEBSITE CONTENT:**\n\n{website_content}\n\n---\n\n{prompt}"
+
+        # Log request
+        log_content = [
+            "=" * 80,
+            f"CLAUDE AI REQUEST #{self.request_count}",
+            f"Timestamp: {datetime.now().isoformat()}",
+            f"Method: Claude Code CLI",
+            "=" * 80,
+            "",
+            "--- PROMPT ---",
+            full_prompt,
+            "",
+            "--- EXECUTION START ---",
+            f"Command: claude --print <prompt>",
+            f"Timeout: 300 seconds",
+            ""
+        ]
 
         # Call claude CLI with --print flag for non-interactive output
         try:
@@ -223,10 +272,52 @@ Generate content for file: {company_name}_CALL_PREP.md
                 timeout=300,  # 5 minute timeout
                 check=True
             )
-            return result.stdout.strip()
+
+            ai_response = result.stdout.strip()
+
+            # Log successful response
+            log_content.extend([
+                "--- AI RESPONSE ---",
+                ai_response,
+                "",
+                "--- RESPONSE METADATA ---",
+                f"Status: SUCCESS",
+                f"Response Length: {len(ai_response)} characters",
+                f"STDERR (if any): {result.stderr if result.stderr else '(none)'}",
+                "",
+                "=" * 80
+            ])
+
+            # Write log file
+            with open(log_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(log_content))
+
+            print(f"    📝 AI interaction logged: {log_file.name}")
+
+            return ai_response
+
         except subprocess.TimeoutExpired:
+            log_content.extend([
+                "--- ERROR ---",
+                "Claude CLI timed out after 5 minutes",
+                "",
+                "=" * 80
+            ])
+            with open(log_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(log_content))
             raise RuntimeError("Claude CLI timed out after 5 minutes")
+
         except subprocess.CalledProcessError as e:
+            log_content.extend([
+                "--- ERROR ---",
+                f"Claude CLI failed with exit code: {e.returncode}",
+                f"STDERR: {e.stderr}",
+                f"STDOUT: {e.stdout}",
+                "",
+                "=" * 80
+            ])
+            with open(log_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(log_content))
             raise RuntimeError(f"Claude CLI failed: {e.stderr}")
 
     def parse_and_save_reports(self, company_name: str, ai_output: str) -> Tuple[bool, List[str]]:

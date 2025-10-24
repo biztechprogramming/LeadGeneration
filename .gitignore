@@ -171,3 +171,7 @@ cython_debug/
 /LeadGen/
 /test_reports_cerebras/
 /test_reports/
+/sales_intelligence_reports/
+/scrape_cache/
+/test_output/
+/intelligent_research_output/

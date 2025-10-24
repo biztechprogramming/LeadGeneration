@@ -23,7 +23,7 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime
-from cerebras_intelligent_research import (
+from intelligent_research import (
     IterativeResearchOrchestrator,
     GeminiCerebrasClient,
     AIDecisionEngine,

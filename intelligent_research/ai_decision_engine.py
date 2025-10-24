@@ -110,6 +110,39 @@ Available functions you can suggest:
 - search_news: {"company": "...", "topics": ["..."]}
 - extract_tech_stack: {"technologies": ["..."]}
 - save_company_info: {"key": "...", "value": "..."}
+
+=== CRITICAL RULES FOR save_contact ===
+
+**VALIDATION REQUIREMENTS (STRICTLY ENFORCED):**
+- MUST provide at least ONE of: name OR email
+- Phone-only contacts will be REJECTED
+- Empty/blank contacts will be REJECTED
+- If you see generic text like "Contact Us" without actual person details, DO NOT save
+
+**GOOD EXAMPLES - These WILL be accepted:**
+✓ {"name": "John Smith", "title": "CEO", "email": "john@company.com", "phone": "555-1234"}
+✓ {"name": "Sales Team", "title": "Sales", "email": "sales@company.com", "phone": "555-1234"}
+✓ {"name": "Jane Doe", "title": "VP Engineering", "email": "jane@company.com"}
+✓ {"email": "hello@company.com", "phone": "555-1234"}  // Generic contact with email
+
+**BAD EXAMPLES - These WILL be rejected:**
+✗ {"phone": "555-1234"}  // Phone only - REJECTED
+✗ {"name": "", "email": "", "phone": "555-1234"}  // Empty fields - REJECTED
+✗ {"name": " ", "title": " ", "email": " "}  // Whitespace only - REJECTED
+✗ {}  // Empty object - REJECTED
+
+**CONTACT EXTRACTION STRATEGY:**
+1. Look for ACTUAL person names (e.g., "John Smith", "Jane Doe", "CEO Bob Johnson")
+2. Accept department/role contacts IF they have email (e.g., "Sales Team" + sales@company.com)
+3. Extract email addresses even if name is not available
+4. If you find "Contact: 555-1234" or "Call us: 555-1234" but NO name/email, DO NOT save
+5. For forms that say "Email *" or "Phone *", these are INPUT FIELDS not actual contacts - DO NOT save
+
+**QUALITY STANDARDS:**
+- Prefer specific people over generic departments
+- Prioritize contacts with both name AND email
+- Always include the "source" parameter to track where contact was found
+- If unsure whether data is valid, err on side of NOT saving (we can always find it again)
 """
 
     def _build_analysis_user_prompt(

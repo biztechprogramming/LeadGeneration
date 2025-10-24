@@ -7,8 +7,14 @@ and parsing structured responses.
 
 import re
 import json
+import logging
 import requests
+from pathlib import Path
+from datetime import datetime
 from typing import Dict, Any, Optional
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class GeminiCerebrasClient:
@@ -17,13 +23,14 @@ class GeminiCerebrasClient:
     Constructs API requests and parses JSON responses.
     """
 
-    def __init__(self, api_key: str, model: str = "llama-3.3-70b"):
+    def __init__(self, api_key: str, model: str = "llama-3.3-70b", log_dir: str = "ai_logs"):
         """
         Initialize Cerebras API client.
 
         Args:
             api_key: Cerebras API key
             model: Model to use (default: llama-3.3-70b)
+            log_dir: Directory for detailed AI interaction logs
 
         Raises:
             ValueError: If api_key is empty
@@ -35,6 +42,13 @@ class GeminiCerebrasClient:
         self.model = model
         self.api_base = "https://api.cerebras.ai/v1"
 
+        # Setup logging directory
+        self.log_dir = Path(log_dir)
+        self.log_dir.mkdir(exist_ok=True)
+
+        # Request counter for unique log files
+        self.request_count = 0
+
     def send_prompt(
         self,
         prompt: str,
@@ -43,7 +57,7 @@ class GeminiCerebrasClient:
         max_tokens: int = 4000
     ) -> str:
         """
-        Send prompt to Cerebras via API.
+        Send prompt to Cerebras via API with comprehensive logging.
 
         Args:
             prompt: User prompt text
@@ -57,6 +71,10 @@ class GeminiCerebrasClient:
         Raises:
             RuntimeError: If API request fails
         """
+        self.request_count += 1
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        log_file = self.log_dir / f"request_{self.request_count:03d}_{timestamp}.log"
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -80,6 +98,26 @@ class GeminiCerebrasClient:
             "max_tokens": max_tokens
         }
 
+        # Log request details
+        log_content = [
+            "=" * 80,
+            f"AI REQUEST #{self.request_count}",
+            f"Timestamp: {datetime.now().isoformat()}",
+            f"Model: {self.model}",
+            "=" * 80,
+            "",
+            "--- SYSTEM PROMPT ---",
+            system_prompt if system_prompt else "(none)",
+            "",
+            "--- USER PROMPT ---",
+            prompt,
+            "",
+            "--- REQUEST PARAMETERS ---",
+            f"Temperature: {temperature}",
+            f"Max Tokens: {max_tokens}",
+            "",
+        ]
+
         try:
             response = requests.post(
                 f"{self.api_base}/chat/completions",
@@ -90,13 +128,62 @@ class GeminiCerebrasClient:
             response.raise_for_status()
 
             result = response.json()
-            return result['choices'][0]['message']['content']
+            ai_response = result['choices'][0]['message']['content']
+
+            # Log successful response
+            log_content.extend([
+                "--- AI RESPONSE ---",
+                ai_response,
+                "",
+                "--- RESPONSE METADATA ---",
+                f"Status: SUCCESS",
+                f"Usage: {json.dumps(result.get('usage', {}), indent=2)}",
+                "",
+                "=" * 80
+            ])
+
+            # Write log file
+            with open(log_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(log_content))
+
+            logger.info(f"AI request #{self.request_count} logged to {log_file}")
+            print(f"    📝 AI interaction logged: {log_file.name}")
+
+            return ai_response
 
         except requests.exceptions.Timeout:
+            log_content.extend([
+                "--- ERROR ---",
+                "Cerebras API timed out after 120 seconds",
+                "",
+                "=" * 80
+            ])
+            with open(log_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(log_content))
             raise RuntimeError("Cerebras API timed out after 120 seconds")
+
         except requests.exceptions.HTTPError as e:
+            log_content.extend([
+                "--- ERROR ---",
+                f"HTTP Error: {e.response.status_code}",
+                f"Response: {e.response.text}",
+                "",
+                "=" * 80
+            ])
+            with open(log_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(log_content))
             raise RuntimeError(f"Cerebras API error: {e.response.text}")
+
         except Exception as e:
+            log_content.extend([
+                "--- ERROR ---",
+                f"Exception: {type(e).__name__}",
+                f"Message: {str(e)}",
+                "",
+                "=" * 80
+            ])
+            with open(log_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(log_content))
             raise RuntimeError(f"Cerebras API failed: {str(e)}")
 
     def parse_json_response(self, response: str) -> Dict[str, Any]:
