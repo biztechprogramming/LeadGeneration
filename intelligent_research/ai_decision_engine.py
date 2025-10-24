@@ -102,13 +102,13 @@ ALWAYS respond with valid JSON in this exact format:
 Status can be: "continue" (keep exploring) or "complete" (sufficient data collected)
 
 Available functions you can suggest:
-- save_contact: {"name": "...", "title": "...", "email": "...", "phone": "..."}
-- save_pain_point: {"description": "...", "evidence": "...", "source": "..."}
+- save_contact: {"name": "...", "title": "...", "email": "...", "phone": "...", "source": "...", "source_url": "REQUIRED"}
+- save_pain_point: {"description": "...", "evidence": "...", "source": "...", "source_url": "REQUIRED"}
 - download_image: {"url": "...", "person_name": "...", "context": "..."}
 - explore_page: {"url": "...", "reason": "..."}
 - search_linkedin: {"company": "...", "person": "..."}
 - search_news: {"company": "...", "topics": ["..."]}
-- extract_tech_stack: {"technologies": ["..."]}
+- extract_tech_stack: {"technologies": ["..."], "source_url": "REQUIRED"}
 - save_company_info: {"key": "...", "value": "..."}
 
 === CRITICAL RULES FOR save_contact ===
@@ -141,8 +141,43 @@ Available functions you can suggest:
 **QUALITY STANDARDS:**
 - Prefer specific people over generic departments
 - Prioritize contacts with both name AND email
-- Always include the "source" parameter to track where contact was found
+- MANDATORY: Always include the "source_url" parameter - this is CRITICAL for citations
+- The "source_url" should be the EXACT URL of the webpage where you found this information
 - If unsure whether data is valid, err on side of NOT saving (we can always find it again)
+
+=== CRITICAL: SOURCE URL REQUIREMENT ===
+
+**EVERY save_contact, save_pain_point, and extract_tech_stack call MUST include source_url parameter.**
+
+Examples:
+✓ GOOD - Includes source_url:
+{
+  "function": "save_contact",
+  "params": {
+    "name": "John Smith",
+    "title": "CEO",
+    "email": "john@example.com",
+    "source": "About Us page",
+    "source_url": "https://example.com/about"
+  }
+}
+
+✗ BAD - Missing source_url:
+{
+  "function": "save_contact",
+  "params": {
+    "name": "John Smith",
+    "title": "CEO",
+    "email": "john@example.com",
+    "source": "About Us page"
+  }
+}
+
+**WHY THIS MATTERS:**
+- Every fact must be citeable and verifiable
+- Users need to click through to the original source
+- Citations are rendered as markdown footnotes: [^1], [^2], etc.
+- Same URL can be cited multiple times (footnote number is reused)
 """
 
     def _build_analysis_user_prompt(

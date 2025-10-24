@@ -29,7 +29,7 @@ class WebsiteExplorer:
         self.scrape_cache_dir.mkdir(exist_ok=True)
         print(f"✓ Website explorer initialized with cache: {self.scrape_cache_dir}")
 
-    def explore_page(self, url: str, reason: str = "") -> Tuple[bool, Optional[str]]:
+    def explore_page(self, url: str, reason: str = "") -> Tuple[bool, Optional[str], str]:
         """
         Explore a webpage using Claude Code + Firecrawl MCP.
 
@@ -38,7 +38,8 @@ class WebsiteExplorer:
             reason: Reason for exploring (for logging)
 
         Returns:
-            Tuple of (success: bool, content: Optional[str])
+            Tuple of (success: bool, content: Optional[str], url: str)
+            The URL is returned for citation purposes
         """
         print(f"    → Exploring: {url}")
         if reason:
@@ -50,7 +51,7 @@ class WebsiteExplorer:
             if cache_file.exists():
                 content = cache_file.read_text(encoding='utf-8')
                 print(f"      ✓ Using cached content ({len(content)} characters)")
-                return True, content
+                return True, content, url
 
             # Use qwen -y -p to scrape via Firecrawl MCP (Cerebras-powered, much faster!)
             import subprocess
@@ -89,20 +90,20 @@ Return ONLY the markdown content, no explanations or formatting. Just the raw sc
                     # Cache the result
                     cache_file.write_text(content, encoding='utf-8')
                     print(f"      ✓ Scraped {len(content)} characters (cached)")
-                    return True, content
+                    return True, content, url
                 else:
                     print(f"      ✗ Content too short ({len(content)} chars)")
-                    return False, None
+                    return False, None, url
             else:
                 print(f"      ✗ Scraping failed: {result.stderr[:200] if result.stderr else 'no output'}")
-                return False, None
+                return False, None, url
 
         except subprocess.TimeoutExpired:
             print(f"      ✗ Scraping timeout after 120s")
-            return False, None
+            return False, None, url
         except Exception as e:
             print(f"      ✗ Error scraping {url}: {e}")
-            return False, None
+            return False, None, url
 
     def search_linkedin(
         self,

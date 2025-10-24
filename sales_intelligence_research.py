@@ -201,11 +201,93 @@ Generate content for file: {company_name}_CALL_PREP.md
 
 ---
 
+**CRITICAL CITATION REQUIREMENTS:**
+🔗 **EVERY SINGLE FACT MUST HAVE A CITATION WITH CLICKABLE URL!**
+
+**MANDATORY CITATION RULES:**
+1. **USE MARKDOWN FOOTNOTE SYNTAX:** [^1], [^2], [^3], etc.
+2. **CITE EVERY INDIVIDUAL FACT:** Each name, title, email, phone number, statement gets its own citation marker
+3. **REUSE CITATION NUMBERS:** If multiple facts come from the EXACT SAME URL, use the same citation number
+4. **NEW URL = NEW NUMBER:** Different URL/page = different citation number
+5. **END EACH SECTION:** Add "## Citations" at the bottom of EACH file section with all URL definitions
+
+**WHAT REQUIRES CITATIONS (Everything!):**
+- ✅ **Names:** John Smith[^1]
+- ✅ **Titles:** CEO[^1], VP of Sales[^2]
+- ✅ **Emails:** john@example.com[^1]
+- ✅ **Phone Numbers:** 555-1234[^1]
+- ✅ **Pain Points:** "Scaling infrastructure challenges"[^3]
+- ✅ **Evidence:** "Blog post mentions migration to cloud"[^3]
+- ✅ **Technologies:** React[^4], Node.js[^4]
+- ✅ **Company Info:** Founded in 2010[^5], 50 employees[^5]
+- ✅ **News Items:** "Raised $10M Series A"[^6]
+- ✅ **Departments:** Engineering team[^2], Sales department[^7]
+
+**GRANULAR CITATION RULES:**
+1. **Same URL, Same Facts → Same Citation:**
+   - If "John Smith" and "CEO" both come from https://example.com/about
+   - Use: John Smith[^1], CEO[^1]
+   - Citation: [^1]: https://example.com/about
+
+2. **Different URLs → Different Citations:**
+   - If "John Smith" from https://example.com/about
+   - And "jane@example.com" from https://example.com/contact
+   - Use: John Smith[^1], jane@example.com[^2]
+   - Citations: [^1]: https://example.com/about, [^2]: https://example.com/contact
+
+3. **Paragraph Rule:**
+   - If entire paragraph comes from ONE source, cite once at end of paragraph
+   - If paragraph combines info from multiple sources, cite each fact individually
+
+**CITATION FORMAT IN TABLES:**
+```markdown
+| Name | Title | Email | Phone | Source |
+|------|-------|-------|-------|--------|
+| John Smith[^1] | CEO[^1] | john@example.com[^1] | 555-1234[^1] | About Us page |
+| Jane Doe[^2] | CTO[^2] | jane@example.com[^2] | 555-5678[^2] | Team page |
+
+## Citations
+[^1]: https://example.com/about
+[^2]: https://example.com/team
+```
+
+**CITATION FORMAT IN LISTS:**
+```markdown
+1. **Infrastructure Scaling Challenges[^3]:** The company blog discusses migration challenges and cloud adoption[^3]
+2. **Legacy System Debt[^4]:** Careers page mentions "modernizing legacy systems"[^4]
+
+## Citations
+[^3]: https://example.com/blog/scaling
+[^4]: https://example.com/careers
+```
+
+**COMPLETE EXAMPLE - CONTACTS TABLE:**
+```markdown
+| Name | Title | Email | Phone | Source |
+|------|-------|-------|-------|--------|
+| John Smith[^1] | CEO[^1] | john@company.com[^1] | 555-0001[^1] | About page |
+| Jane Doe[^2] | VP Engineering[^2] | jane@company.com[^3] | 555-0002[^3] | Team page |
+| Bob Johnson[^4] | Sales Director[^4] | bob@company.com[^4] | - | LinkedIn profile |
+
+**Explanation:**
+- John's name, title, email, phone all from same URL → [^1]
+- Jane's name and title from team page → [^2]
+- Jane's email and phone from contact page → [^3]
+- Bob's info all from LinkedIn → [^4]
+
+## Citations
+[^1]: https://company.com/about
+[^2]: https://company.com/team
+[^3]: https://company.com/contact
+[^4]: https://linkedin.com/in/bobjohnson
+```
+
 **IMPORTANT REMINDERS:**
 1. Use the EXACT delimiter tags shown above to separate sections
 2. Be specific and evidence-based in your analysis
-3. Focus on actionable intelligence for sales teams
-4. If website is unavailable, make reasonable inferences from company name, address, and industry context
+3. **ADD CITATIONS WITH URLS TO EVERY FACT - THIS IS MANDATORY**
+4. Focus on actionable intelligence for sales teams
+5. If website is unavailable, make reasonable inferences from company name, address, and industry context
 """
         return prompt
 

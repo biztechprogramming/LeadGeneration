@@ -65,6 +65,10 @@ class IterativeResearchOrchestrator:
         # Current accumulator (set during company research)
         self.current_accumulator: Optional[DataAccumulator] = None
 
+        # Current source URL (set during page exploration)
+        # This tracks the URL context for all data extractions
+        self.current_source_url: str = ""
+
         # Register available functions
         self._register_functions()
 
@@ -85,7 +89,8 @@ class IterativeResearchOrchestrator:
         title: str = "",
         email: str = "",
         phone: str = "",
-        source: str = ""
+        source: str = "",
+        source_url: str = ""
     ) -> None:
         """
         Save a contact (bound to current accumulator).
@@ -100,6 +105,10 @@ class IterativeResearchOrchestrator:
         phone = phone.strip()
         source = source.strip()
 
+        # Use provided source_url or fall back to current_source_url
+        if not source_url:
+            source_url = self.current_source_url
+
         # Validation: Must have at least name or email
         if not name and not email:
             print(f"    ⚠ Rejected empty contact (no name and no email)")
@@ -112,9 +121,13 @@ class IterativeResearchOrchestrator:
             print(f"      Reason: Need at least a name or email for valid contact")
             return
 
+        # Warn if no source URL
+        if not source_url:
+            print(f"    ⚠ Warning: No source URL for contact {name}")
+
         if self.current_accumulator:
-            self.current_accumulator.add_contact(name, title, email, phone, source)
-            print(f"    ✓ Saved contact: {name} - {title}")
+            self.current_accumulator.add_contact(name, title, email, phone, source, source_url)
+            print(f"    ✓ Saved contact: {name} - {title} [Citation: {source_url[:50] if source_url else 'N/A'}...]")
             if email:
                 print(f"      Email: {email}")
             if phone:
@@ -124,12 +137,21 @@ class IterativeResearchOrchestrator:
         self,
         description: str,
         evidence: str = "",
-        source: str = ""
+        source: str = "",
+        source_url: str = ""
     ) -> None:
-        """Save a pain point."""
+        """Save a pain point with citation."""
+        # Use provided source_url or fall back to current_source_url
+        if not source_url:
+            source_url = self.current_source_url
+
+        # Warn if no source URL
+        if not source_url:
+            print(f"    ⚠ Warning: No source URL for pain point")
+
         if self.current_accumulator:
-            self.current_accumulator.add_pain_point(description, evidence, source)
-            print(f"    ✓ Saved pain point: {description[:50]}...")
+            self.current_accumulator.add_pain_point(description, evidence, source, source_url)
+            print(f"    ✓ Saved pain point: {description[:50]}... [Citation: {source_url[:50] if source_url else 'N/A'}...]")
 
     def _download_image(
         self,
@@ -142,10 +164,16 @@ class IterativeResearchOrchestrator:
         print(f"      Person: {person_name}")
 
     def _explore_page(self, url: str, reason: str = "") -> None:
-        """Explore a webpage."""
-        success, content = self.explorer.explore_page(url, reason)
+        """Explore a webpage and set it as current source context."""
+        success, content, explored_url = self.explorer.explore_page(url, reason)
+
+        # Update current source URL for citation tracking
+        if success:
+            self.current_source_url = explored_url
+            print(f"    📍 Current citation source set to: {explored_url}")
+
         if success and self.current_accumulator:
-            self.current_accumulator.add_source(url, "webpage")
+            self.current_accumulator.add_source(explored_url, "webpage")
 
     def _search_linkedin(self, company: str, person: str = "") -> None:
         """Search LinkedIn."""
@@ -160,12 +188,20 @@ class IterativeResearchOrchestrator:
             for item in news:
                 self.current_accumulator.add_news(**item)
 
-    def _extract_tech_stack(self, technologies: List[str]) -> None:
-        """Extract technology stack."""
+    def _extract_tech_stack(self, technologies: List[str], source_url: str = "") -> None:
+        """Extract technology stack with citation."""
+        # Use provided source_url or fall back to current_source_url
+        if not source_url:
+            source_url = self.current_source_url
+
         if self.current_accumulator:
             for tech in technologies:
-                self.current_accumulator.add_technology(tech, source="AI extraction")
-                print(f"    ✓ Added technology: {tech}")
+                self.current_accumulator.add_technology(
+                    tech,
+                    source="AI extraction",
+                    source_url=source_url
+                )
+                print(f"    ✓ Added technology: {tech} [Citation: {source_url[:50] if source_url else 'N/A'}...]")
 
     def _save_company_info(self, key: str, value: str) -> None:
         """Save company metadata."""
@@ -286,14 +322,17 @@ class IterativeResearchOrchestrator:
         accumulated_data: Dict[str, Any]
     ) -> None:
         """
-        Generate final markdown report with image references.
+        Generate final markdown report with comprehensive inline citations.
 
         Args:
             company_name: Company name
-            accumulated_data: All collected data
+            accumulated_data: All collected data with citation tracking
         """
         sanitized_name = sanitize_filename(company_name)
         report_path = self.output_dir / f"{sanitized_name}_INTELLIGENT_RESEARCH.md"
+
+        # Get citation mappings
+        citations = self.current_accumulator.get_citations() if self.current_accumulator else {}
 
         # Build report sections
         report_lines = [
@@ -301,6 +340,7 @@ class IterativeResearchOrchestrator:
             "",
             f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"**Research Iterations:** {accumulated_data['metadata']['iterations']}",
+            f"**Citations Tracked:** {len(citations)}",
             "",
             "---",
             "",
@@ -314,16 +354,26 @@ class IterativeResearchOrchestrator:
             ""
         ]
 
-        # Add contacts table
+        # Add contacts table with inline citations
         if accumulated_data['contacts']:
             report_lines.extend([
                 "| Name | Title | Email | Phone | Source |",
                 "|------|-------|-------|-------|--------|"
             ])
             for contact in accumulated_data['contacts']:
+                # Add citation marker if available
+                citation_marker = f"[^{contact['citation']}]" if contact.get('citation') else ""
+
+                # Build row with citations after each fact
+                name_cell = f"{contact['name']}{citation_marker}" if contact['name'] else ""
+                title_cell = f"{contact['title']}{citation_marker}" if contact['title'] else ""
+                email_cell = f"{contact['email']}{citation_marker}" if contact['email'] else ""
+                phone_cell = f"{contact['phone']}{citation_marker}" if contact['phone'] else ""
+                source_cell = f"{contact['source']}"
+
                 report_lines.append(
-                    f"| {contact['name']} | {contact['title']} | "
-                    f"{contact['email']} | {contact['phone']} | {contact['source']} |"
+                    f"| {name_cell} | {title_cell} | "
+                    f"{email_cell} | {phone_cell} | {source_cell} |"
                 )
         else:
             report_lines.append("*No contacts identified during research.*")
@@ -336,24 +386,70 @@ class IterativeResearchOrchestrator:
             ""
         ])
 
-        # Add pain points
+        # Add pain points with inline citations
         if accumulated_data['pain_points']:
             for i, pain_point in enumerate(accumulated_data['pain_points'], 1):
-                report_lines.append(f"### {i}. {pain_point['description']}")
+                citation_marker = f"[^{pain_point['citation']}]" if pain_point.get('citation') else ""
+
+                report_lines.append(f"### {i}. {pain_point['description']}{citation_marker}")
                 report_lines.append("")
                 if pain_point['evidence']:
-                    report_lines.append(f"**Evidence:** {pain_point['evidence']}")
+                    report_lines.append(f"**Evidence:** {pain_point['evidence']}{citation_marker}")
                     report_lines.append("")
                 report_lines.append(f"**Source:** {pain_point['source']}")
                 report_lines.append("")
         else:
             report_lines.append("*No pain points identified during research.*")
 
+        # Add tech stack section if available
+        if accumulated_data.get('tech_stack'):
+            report_lines.extend([
+                "",
+                "---",
+                "",
+                f"## 🔧 Technology Stack ({len(accumulated_data['tech_stack'])})",
+                ""
+            ])
+
+            # Group by category
+            tech_by_category: Dict[str, List] = {}
+            for tech_item in accumulated_data['tech_stack']:
+                category = tech_item.get('category', 'Other')
+                if category not in tech_by_category:
+                    tech_by_category[category] = []
+                tech_by_category[category].append(tech_item)
+
+            for category, items in sorted(tech_by_category.items()):
+                report_lines.append(f"### {category}")
+                report_lines.append("")
+                for tech_item in items:
+                    citation_marker = f"[^{tech_item['citation']}]" if tech_item.get('citation') else ""
+                    report_lines.append(f"- {tech_item['technology']}{citation_marker}")
+                report_lines.append("")
+
+        # Add citations/footnotes section at the end
+        if citations:
+            report_lines.extend([
+                "",
+                "---",
+                "",
+                "## 📚 Citations",
+                "",
+                "*All facts in this report are cited with clickable sources below:*",
+                ""
+            ])
+
+            # Add footnote definitions (sorted by citation number)
+            for citation_num in sorted(citations.keys()):
+                url = citations[citation_num]
+                report_lines.append(f"[^{citation_num}]: {url}")
+
         # Save report
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(report_lines))
 
         print(f"📄 Report saved: {report_path}")
+        print(f"   📍 {len(citations)} unique sources cited")
 
     def run_batch_research(
         self,
